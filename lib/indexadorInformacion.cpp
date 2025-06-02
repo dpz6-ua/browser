@@ -46,18 +46,30 @@ ostream& operator<<(ostream& s, const InfTermDoc& p) {
 }
 
 istream& operator>>(istream& s, InfTermDoc& p) {
-    int numPos;
     string term;
-    s >> term;  // "ft:"
-    s >> p.ft;  // Leer la frecuencia del término en el documento
-    // cout << "INFORMACION TERMINO DOC ft: " << p.ft << endl;
-    
+    s >> term;    // Leer "ft:"
+    s >> p.ft;    // Leer la frecuencia del término
+
     p.posTerm.clear();
-    for (int i = 0; i < p.getFT(); i++) {
-        s >> numPos;
-        p.posTerm.push_back(numPos);
+
+    // Intentamos leer la primera posición (tentativamente)
+    int pos;
+    if (s >> pos) {
+        // Si se leyó correctamente un número, lo añadimos
+        p.posTerm.push_back(pos);
+
+        // Leemos el resto de posiciones (si ft > 1)
+        for (int i = 1; i < p.ft; ++i) {
+            if (s >> pos)
+                p.posTerm.push_back(pos);
+            else
+                break;  // Por seguridad
+        }
+    } else {
+        // Si no se leyó número, limpiamos el error y dejamos el stream listo
+        s.clear();
     }
-    
+
     return s;
 }
 

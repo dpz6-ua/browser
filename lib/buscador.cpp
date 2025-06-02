@@ -88,11 +88,14 @@ bool Buscador::Buscar(const int& numDocumentos) {
                 InformacionTermino infoTerminoDoc;
 
                 if (!Devuelve(terminoDoc, infoTerminoDoc)) {
+                    cout << "El término " << terminoDoc << " no está en el índice." << endl;
                     continue; // Término no encontrado en el índice
                 }
 
                 // Verificar si el documento contiene el término
+                // cout << infoTerminoDoc << endl;
                 if (infoTerminoDoc.getL_docs().count(idDoc) == 0) {
+                    cout << "El documento " << idDoc << " no contiene el término " << terminoDoc << "." << endl;
                     continue;
                 }
 
@@ -292,7 +295,8 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
 
     double pesoPregunta = pesosPregunta.at(termino);
 
-    cout << "[DFR] Termino: " << termino 
+    cout << "[DFR] Documento: " << idDoc
+         << " | Termino: " << termino 
          << " | ftd: " << ftd 
          << " | ft: " << ft 
          << " | N: " << N 
