@@ -35,40 +35,86 @@ Buscador& Buscador::operator=(const Buscador& busc) {
 }
 
 bool Buscador::Buscar(const int& numDocumentos) {
+    // Limpiar la cola de resultados previos
     docsOrdenados = priority_queue<ResultadoRI>();
+
+    // Paso 1: Verificar si hay una pregunta indexada con términos válidos
     string pregunta;
     if (!DevuelvePregunta(pregunta)) {
         cerr << "ERROR: No hay ninguna pregunta indexada." << endl;
         return false;
     }
 
+    // Paso 2: Calcular los pesos de los términos de la pregunta
     map<string, double> pesosPregunta;
-    if (!CalcularPesosPregunta(pesosPregunta)) return false;
+    if (!CalcularPesosPregunta(pesosPregunta)) {
+        cerr << "ERROR: No se pudieron calcular los pesos de la pregunta." << endl;
+        return false;
+    }
 
-    set<int> docsProcesados;
-    for (const auto& par : pesosPregunta) {
-        InformacionTermino info;
-        if (!Devuelve(par.first, info)) continue;
+    if (pesosPregunta.empty()) {
+        cerr << "ERROR: La pregunta no contiene términos válidos (no de parada)." << endl;
+        return false;
+    }
 
-        for (const auto& doc : info.getL_docs()) {
-            int idDoc = doc.first;
-            if (docsProcesados.count(idDoc)) continue;
+    // Paso 3: Procesar documentos que comparten términos con la pregunta
+    set<int> docsProcesados; // Para evitar procesar un documento más de una vez
+
+    for (const auto& terminoPregunta : pesosPregunta) {
+        const string& termino = terminoPregunta.first;
+        InformacionTermino infoTermino;
+
+        // Si el término no está en el índice, continuar con el siguiente
+        if (!Devuelve(termino, infoTermino)) {
+            cerr << "El término " << termino << " no está en el índice." << endl;
+            continue;
+        }
+
+        // Procesar cada documento que contiene el término
+        for (const auto& parDoc : infoTermino.getL_docs()) {
+            int idDoc = parDoc.first;
+
+            // Si ya procesamos este documento, saltar
+            if (docsProcesados.count(idDoc) > 0) {
+                continue;
+            }
             docsProcesados.insert(idDoc);
 
-            double score = 0.0;
-            for (const auto& term : pesosPregunta) {
-                // Comprobar si el término está en el documento
-                InformacionTermino infoTerm;
-                if (!Devuelve(term.first, infoTerm)) continue;
+            // Paso 4: Calcular similitud para el documento actual
+            double scoreTotal = 0.0;
 
-                if (infoTerm.getL_docs().count(idDoc) == 0) continue;
+            for (const auto& terminoQuery : pesosPregunta) {
+                const string& terminoDoc = terminoQuery.first;
+                InformacionTermino infoTerminoDoc;
 
-                double s = (formSimilitud == 0) ? CalcularDFR(term.first, idDoc, pesosPregunta) : CalcularBM25(term.first, idDoc, pesosPregunta);
-                score += s;
+                if (!Devuelve(terminoDoc, infoTerminoDoc)) {
+                    continue; // Término no encontrado en el índice
+                }
+
+                // Verificar si el documento contiene el término
+                if (infoTerminoDoc.getL_docs().count(idDoc) == 0) {
+                    continue;
+                }
+
+                // Calcular similitud según la fórmula especificada
+                double scoreTermino = 0.0;
+                scoreTermino = (formSimilitud == 0) ? CalcularDFR(terminoDoc, idDoc, pesosPregunta) : CalcularBM25(terminoDoc, idDoc, pesosPregunta);
+                scoreTotal += scoreTermino;
             }
-            docsOrdenados.push(ResultadoRI(score, idDoc, 0));
+
+            // Paso 5: Almacenar solo los 'numDocumentos' más relevantes
+            if (docsOrdenados.size() < numDocumentos) {
+                docsOrdenados.push(ResultadoRI(scoreTotal, idDoc, 0));
+            } else {
+                // Si la cola está llena, reemplazar el peor score si el actual es mejor
+                if (scoreTotal > docsOrdenados.top().VSimilitud()) {
+                    docsOrdenados.pop();
+                    docsOrdenados.push(ResultadoRI(scoreTotal, idDoc, 0));
+                }
+            }
         }
     }
+
     return true;
 }
 
@@ -193,9 +239,16 @@ void Buscador::DevolverParametrosBM25(double& kk1, double& kb) const {
 
 bool Buscador::CalcularPesosPregunta(map<string, double>& pesos) const {
     pesos.clear();
+    if (indicePregunta.empty()) return false;
+
+    // Número de términos únicos (no de parada) en la pregunta
+    int k = indicePregunta.size(); 
+
     for (const auto& par : indicePregunta) {
-        pesos[par.first] = log(1 + par.second.getFT());
+        double fiq = par.second.getFT(); // Frecuencia del término en la pregunta
+        pesos[par.first] = fiq / k;     // w_iq = fiq / k (sin logaritmo)
     }
+
     return true;
 }
 
@@ -234,7 +287,8 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
     double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
 
     int ftd = docInfo->second.getFT();
-    double wd = ftd * log2(1 + c * avgdl / ld) * log2((1 + lambda + ftd) / lambda);
+    // Fórmula DFR corregida:
+    double wd = ftd * log2(1 + (c * avgdl) / ld) * (ftd * log2(1 + lambda) + 0.5 * log2(2 * M_PI * ftd)) / (ftd + 1.0);
 
     double pesoPregunta = pesosPregunta.at(termino);
 
@@ -285,11 +339,17 @@ double Buscador::CalcularBM25(const string& termino, int idDoc, const map<string
     int dl = it->second.getNumPalSinParada();
     double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
 
-    double idf = log2((N - nq + 0.5) / (nq + 0.5));
-    double frac = (ftd * (k1 + 1)) / (ftd + k1 * (1 - b + b * dl / avgdl));
+    // Cálculo de IDF corregido (usando log natural como en la fórmula estándar)
+    double idf = log((N - nq + 0.5) / (nq + 0.5) + 1.0);  // +1 para evitar negativos
+    
+    // Fórmula BM25 corregida
+    double numerador = ftd * (k1 + 1);
+    double denominador = ftd + k1 * (1 - b + b * (dl / avgdl));
+    double frac = numerador / denominador;
 
     double pesoPregunta = pesosPregunta.at(termino);
 
+    /*
     cout << "[BM25] Termino: " << termino 
          << " | ftd: " << ftd 
          << " | nq: " << nq 
@@ -299,6 +359,7 @@ double Buscador::CalcularBM25(const string& termino, int idDoc, const map<string
          << " | pesoPregunta: " << pesoPregunta 
          << " | Resultado: " << pesoPregunta * idf * frac << endl;
 
+    */
     return pesoPregunta * idf * frac;
 }
 
