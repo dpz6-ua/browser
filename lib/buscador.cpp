@@ -95,7 +95,7 @@ bool Buscador::Buscar(const int& numDocumentos) {
                 // Verificar si el documento contiene el término
                 // cout << infoTerminoDoc << endl;
                 if (infoTerminoDoc.getL_docs().count(idDoc) == 0) {
-                    cout << "El documento " << idDoc << " no contiene el término " << terminoDoc << "." << endl;
+                    cout << "El documento " << idDoc << " no contiene el termino " << terminoDoc << "." << endl;
                     continue;
                 }
 
@@ -285,16 +285,19 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
 
     int ft = infTerm.getFTC();
     int N = informacionColeccionDocs.getNumDocs();
+    int nt = infTerm.getL_docs().size();
     double lambda = static_cast<double>(ft) / N;
     int ld = it->second.getNumPalSinParada();
     double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
-
     int ftd = docInfo->second.getFT();
+
+    double ftd_star = ftd * log2(1 + ((c * avgdl) / ld));
     // Fórmula DFR corregida:
-    double wd = ftd * log2(1 + (c * avgdl) / ld) * (ftd * log2(1 + lambda) + 0.5 * log2(2 * M_PI * ftd)) / (ftd + 1.0);
+    double wtd = (log2(1 + lambda) + ftd_star * log2((1+lambda) / lambda)) * ((ft + 1) / (nt * (ftd_star + 1)));
 
     double pesoPregunta = pesosPregunta.at(termino);
 
+    
     cout << "[DFR] Documento: " << idDoc
          << " | Termino: " << termino 
          << " | ftd: " << ftd 
@@ -304,9 +307,9 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
          << " | ld: " << ld 
          << " | avgdl: " << avgdl 
          << " | pesoPregunta: " << pesoPregunta 
-         << " | Resultado: " << pesoPregunta * wd << endl;
+         << " | Resultado: " << pesoPregunta * wtd << endl;
 
-    return pesoPregunta * wd;
+    return pesoPregunta * wtd;
 }
 
 double Buscador::CalcularBM25(const string& termino, int idDoc, const map<string, double>& pesosPregunta) const {
