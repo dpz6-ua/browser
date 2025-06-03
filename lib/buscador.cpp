@@ -95,7 +95,7 @@ bool Buscador::Buscar(const int& numDocumentos) {
                 // Verificar si el documento contiene el término
                 // cout << infoTerminoDoc << endl;
                 if (infoTerminoDoc.getL_docs().count(idDoc) == 0) {
-                    cout << "El documento " << idDoc << " no contiene el termino " << terminoDoc << "." << endl;
+                    //cout << "El documento " << idDoc << " no contiene el termino " << terminoDoc << "." << endl;
                     continue;
                 }
 
@@ -297,7 +297,7 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
 
     double pesoPregunta = pesosPregunta.at(termino);
 
-    
+    /*
     cout << "[DFR] Documento: " << idDoc
          << " | Termino: " << termino 
          << " | ftd: " << ftd 
@@ -308,7 +308,7 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
          << " | avgdl: " << avgdl 
          << " | pesoPregunta: " << pesoPregunta 
          << " | Resultado: " << pesoPregunta * wtd << endl;
-
+    */
     return pesoPregunta * wtd;
 }
 
@@ -340,34 +340,32 @@ double Buscador::CalcularBM25(const string& termino, int idDoc, const map<string
         return 0.0;
     }
 
-    int ftd = docInfo->second.getFT();
     int N = informacionColeccionDocs.getNumDocs();
     int nq = infTerm.getL_docs().size();
-    int dl = it->second.getNumPalSinParada();
-    double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
-
     // Cálculo de IDF corregido (usando log natural como en la fórmula estándar)
-    double idf = log((N - nq + 0.5) / (nq + 0.5) + 1.0);  // +1 para evitar negativos
+    double idf = log2((N - nq + 0.5) / (nq + 0.5));
+
+    int ftd = docInfo->second.getFT();
+    int d = it->second.getNumPalSinParada();
+    double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
     
     // Fórmula BM25 corregida
     double numerador = ftd * (k1 + 1);
-    double denominador = ftd + k1 * (1 - b + b * (dl / avgdl));
+    double denominador = ftd + k1 * (1 - b + b * (d / avgdl));
     double frac = numerador / denominador;
 
-    double pesoPregunta = pesosPregunta.at(termino);
-
     /*
-    cout << "[BM25] Termino: " << termino 
+    cout << "[BM25] Documento: " << idDoc
+         << " | Termino: " << termino
          << " | ftd: " << ftd 
          << " | nq: " << nq 
          << " | N: " << N 
          << " | idf: " << idf 
          << " | frac: " << frac 
-         << " | pesoPregunta: " << pesoPregunta 
-         << " | Resultado: " << pesoPregunta * idf * frac << endl;
+         << " | Resultado: " << idf * frac << endl;
 
     */
-    return pesoPregunta * idf * frac;
+    return idf * frac;
 }
 
 
