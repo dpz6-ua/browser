@@ -244,8 +244,11 @@ bool Buscador::CalcularPesosPregunta(map<string, double>& pesos) const {
     pesos.clear();
     if (indicePregunta.empty()) return false;
 
-    // Número de términos únicos (no de parada) en la pregunta
-    int k = indicePregunta.size(); 
+    int k = 0;
+    // Número de términos en la pregunta
+    for (const auto& par : indicePregunta) {
+        k += par.second.getFT();
+    }
 
     for (const auto& par : indicePregunta) {
         double fiq = par.second.getFT(); // Frecuencia del término en la pregunta
