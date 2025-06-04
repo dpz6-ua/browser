@@ -133,6 +133,7 @@ private:
     double CalcularBM25(const string& termino, int idDoc, const map<string, double>& pesosPregunta) const;
     string DevolverNombreDoc(int idDoc) const;
     string ExtraerNombreDoc(int idDoc) const;
+    double CalcularScoreDocumento(int idDoc, const map<string, double>& pesosPregunta, const map<string, InformacionTermino>& indiceTemporal);
 };
 
 #endif // BUSCADOR_H

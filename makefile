@@ -1,4 +1,5 @@
-.PHONY= clean
+.PHONY: clean test final
+
 CC=g++
 OPTIONS= -g
 DEBUG= #-D DEBUG
@@ -15,10 +16,15 @@ buscador: src/main.cpp $(OBJ)
 $(LIBDIR)/%.o : $(LIBDIR)/%.cpp $(INCLUDEDIR)/%.h
 	$(CC) $(OPTIONS) $(DEBUG) -c -I$(INCLUDEDIR) -o $@ $<
 
-# Nueva regla para compilar y ejecutar pruebas
+# Regla para compilar y ejecutar pruebas (tad02.cpp)
 test: src/tad02.cpp $(OBJ)
 	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/tad02.cpp $(OBJ) -o test
 	./test
 
+# Regla para compilar y ejecutar mainFinal.cpp
+final: src/mainFinal.cpp $(OBJ)
+	$(CC) $(OPTIONS) $(DEBUG) -I$(INCLUDEDIR) src/mainFinal.cpp $(OBJ) -o final
+	./final
+
 clean:
-	rm -f $(OBJ) test
+	rm -f $(OBJ) test final

@@ -34,86 +34,65 @@ Buscador& Buscador::operator=(const Buscador& busc) {
     return *this;
 }
 
+double Buscador::CalcularScoreDocumento(int idDoc, const map<string, double>& pesosPregunta,
+                                        const map<string, InformacionTermino>& indiceTemporal) {
+    double scoreTotal = 0.0;
+    for (const auto& terminoQuery : pesosPregunta) {
+        auto it = indiceTemporal.find(terminoQuery.first);
+        if (it == indiceTemporal.end()) continue;
+
+        const auto& infoTerm = it->second;
+        if (infoTerm.getL_docs().count(idDoc) == 0) continue;
+
+        double score = (formSimilitud == 0) ?
+            CalcularDFR(terminoQuery.first, idDoc, pesosPregunta) :
+            CalcularBM25(terminoQuery.first, idDoc, pesosPregunta);
+
+        scoreTotal += score;
+    }
+    return scoreTotal;
+}
+
 bool Buscador::Buscar(const int& numDocumentos) {
-    // Limpiar la cola de resultados previos
     docsOrdenados = priority_queue<ResultadoRI>();
 
-    // Paso 1: Verificar si hay una pregunta indexada con términos válidos
     string pregunta;
     if (!DevuelvePregunta(pregunta)) {
         cerr << "ERROR: No hay ninguna pregunta indexada." << endl;
         return false;
     }
 
-    // Paso 2: Calcular los pesos de los términos de la pregunta
     map<string, double> pesosPregunta;
-    if (!CalcularPesosPregunta(pesosPregunta)) {
-        cerr << "ERROR: No se pudieron calcular los pesos de la pregunta." << endl;
+    if (!CalcularPesosPregunta(pesosPregunta) || pesosPregunta.empty()) {
+        cerr << "ERROR: Pregunta inválida o sin términos significativos." << endl;
         return false;
     }
 
-    if (pesosPregunta.empty()) {
-        cerr << "ERROR: La pregunta no contiene términos válidos (no de parada)." << endl;
-        return false;
-    }
+    unordered_set<int> docsProcesados;
+    map<string, InformacionTermino> indiceTemporal;
 
-    // Paso 3: Procesar documentos que comparten términos con la pregunta
-    set<int> docsProcesados; // Para evitar procesar un documento más de una vez
-
-    for (const auto& terminoPregunta : pesosPregunta) {
-        const string& termino = terminoPregunta.first;
-        InformacionTermino infoTermino;
-
-        // Si el término no está en el índice, continuar con el siguiente
-        if (!Devuelve(termino, infoTermino)) {
-            cerr << "El término " << termino << " no está en el índice." << endl;
-            continue;
+    for (const auto& termino : pesosPregunta) {
+        InformacionTermino info;
+        if (Devuelve(termino.first, info)) {
+            indiceTemporal[termino.first] = info;
         }
+    }
 
-        // Procesar cada documento que contiene el término
-        for (const auto& parDoc : infoTermino.getL_docs()) {
-            int idDoc = parDoc.first;
+    for (const auto& par : indiceTemporal) {
+        const string& termino = par.first;
+        const InformacionTermino& infoTerm = par.second;
 
-            // Si ya procesamos este documento, saltar
-            if (docsProcesados.count(idDoc) > 0) {
-                continue;
-            }
-            docsProcesados.insert(idDoc);
+        for (const auto& docPar : infoTerm.getL_docs()) {
+            int idDoc = docPar.first;
+            if (!docsProcesados.insert(idDoc).second) continue;
 
-            // Paso 4: Calcular similitud para el documento actual
-            double scoreTotal = 0.0;
+            double scoreTotal = CalcularScoreDocumento(idDoc, pesosPregunta, indiceTemporal);
 
-            for (const auto& terminoQuery : pesosPregunta) {
-                const string& terminoDoc = terminoQuery.first;
-                InformacionTermino infoTerminoDoc;
-
-                if (!Devuelve(terminoDoc, infoTerminoDoc)) {
-                    cout << "El término " << terminoDoc << " no está en el índice." << endl;
-                    continue; // Término no encontrado en el índice
-                }
-
-                // Verificar si el documento contiene el término
-                // cout << infoTerminoDoc << endl;
-                if (infoTerminoDoc.getL_docs().count(idDoc) == 0) {
-                    //cout << "El documento " << idDoc << " no contiene el termino " << terminoDoc << "." << endl;
-                    continue;
-                }
-
-                // Calcular similitud según la fórmula especificada
-                double scoreTermino = 0.0;
-                scoreTermino = (formSimilitud == 0) ? CalcularDFR(terminoDoc, idDoc, pesosPregunta) : CalcularBM25(terminoDoc, idDoc, pesosPregunta);
-                scoreTotal += scoreTermino;
-            }
-
-            // Paso 5: Almacenar solo los 'numDocumentos' más relevantes
             if (docsOrdenados.size() < numDocumentos) {
                 docsOrdenados.push(ResultadoRI(scoreTotal, idDoc, 0));
-            } else {
-                // Si la cola está llena, reemplazar el peor score si el actual es mejor
-                if (scoreTotal > docsOrdenados.top().VSimilitud()) {
-                    docsOrdenados.pop();
-                    docsOrdenados.push(ResultadoRI(scoreTotal, idDoc, 0));
-                }
+            } else if (scoreTotal > docsOrdenados.top().VSimilitud()) {
+                docsOrdenados.pop();
+                docsOrdenados.push(ResultadoRI(scoreTotal, idDoc, 0));
             }
         }
     }
@@ -129,7 +108,7 @@ bool Buscador::Buscar(const string& dirPreguntas, const int& numDocumentos, cons
         ss << dirPreguntas << "/" << i << ".txt";
         ifstream file(ss.str());
         if (!file) {
-            cerr << "ERROR: No se puede abrir el archivo de la pregunta: " << ss.str() << endl;
+            cerr << "ERROR: No se puede abrir el archivo: " << ss.str() << endl;
             continue;
         }
 
@@ -137,33 +116,38 @@ bool Buscador::Buscar(const string& dirPreguntas, const int& numDocumentos, cons
         IndexarPregunta(preguntaTexto);
 
         map<string, double> pesosPregunta;
-        if (!CalcularPesosPregunta(pesosPregunta)) continue;
+        if (!CalcularPesosPregunta(pesosPregunta) || pesosPregunta.empty()) continue;
 
-        set<int> docsProcesados;
-        for (const auto& par : pesosPregunta) {
+        unordered_set<int> docsProcesados;
+        map<string, InformacionTermino> indiceTemporal;
+
+        for (const auto& termino : pesosPregunta) {
             InformacionTermino info;
-            if (!Devuelve(par.first, info)) continue;
+            if (Devuelve(termino.first, info)) {
+                indiceTemporal[termino.first] = info;
+            }
+        }
 
-            for (const auto& doc : info.getL_docs()) {
-                int idDoc = doc.first;
-                if (docsProcesados.count(idDoc)) continue;
-                docsProcesados.insert(idDoc);
+        for (const auto& par : indiceTemporal) {
+            const string& termino = par.first;
+            const InformacionTermino& infoTerm = par.second;
 
-                double score = 0.0;
-                for (const auto& term : pesosPregunta) {
-                    // Comprobar si el término está en el documento
-                    InformacionTermino infoTerm;
-                    if (!Devuelve(term.first, infoTerm)) continue;
+            for (const auto& docPar : infoTerm.getL_docs()) {
+                int idDoc = docPar.first;
+                if (!docsProcesados.insert(idDoc).second) continue;
 
-                    if (infoTerm.getL_docs().count(idDoc) == 0) continue;
+                double score = CalcularScoreDocumento(idDoc, pesosPregunta, indiceTemporal);
 
-                    double s = (formSimilitud == 0) ? CalcularDFR(term.first, idDoc, pesosPregunta) : CalcularBM25(term.first, idDoc, pesosPregunta);
-                    score += s;
+                if (docsOrdenados.size() < numDocumentos) {
+                    docsOrdenados.push(ResultadoRI(score, idDoc, i));
+                } else if (score > docsOrdenados.top().VSimilitud()) {
+                    docsOrdenados.pop();
+                    docsOrdenados.push(ResultadoRI(score, idDoc, i));
                 }
-                docsOrdenados.push(ResultadoRI(score, idDoc, i));
             }
         }
     }
+
     return true;
 }
 
