@@ -23,10 +23,10 @@ double getcputime(void) {
 }
 
 main() {
-    IndexadorHash b("./StopWordsEspanyol.txt", ". ,:", false, false,"./indicePruebaEspanyol", 2, false);
+    IndexadorHash b("./StopWordsIngles.txt", ". ,:", false, true,"./indicePruebaIngles", 2, false);
     b.Indexar("ficherosTimes.txt");
     b.GuardarIndexacion();
-    Buscador a("./indicePruebaEspanyol", 1);
+    Buscador a("./indicePruebaIngles", 1);
     a.IndexarPregunta("KENNEDY ADMINISTRATION PRESSURE ON NGO DINH DIEM TO STOP SUPPRESSING THE BUDDHISTS . ");
 
     double aa=getcputime();
@@ -38,7 +38,7 @@ main() {
     time(&inicioB);
     double aaB=getcputime();
     a.Buscar("CorpusTime/Preguntas/", 423, 1, 83);
-    a.ImprimirResultadoBusqueda(423, "Archivos_de_salida/BM25_conStemming.txt");
+    a.ImprimirResultadoBusqueda(423);
     double bbB=getcputime()-aaB;
     cout << "\nHa tardado " << bbB << " segundos\n\n";
 }

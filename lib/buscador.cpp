@@ -279,7 +279,7 @@ double Buscador::CalcularDFR(const string& termino, int idDoc, const map<string,
     int ftd = docInfo->second.getFT();
 
     double ftd_star = ftd * log2(1 + ((c * avgdl) / ld));
-    // Fórmula DFR corregida:
+
     double wtd = (log2(1 + lambda) + ftd_star * log2((1+lambda) / lambda)) * ((ft + 1) / (nt * (ftd_star + 1)));
 
     double pesoPregunta = pesosPregunta.at(termino);
@@ -329,14 +329,14 @@ double Buscador::CalcularBM25(const string& termino, int idDoc, const map<string
 
     int N = informacionColeccionDocs.getNumDocs();
     int nq = infTerm.getL_docs().size();
-    // Cálculo de IDF corregido (usando log natural como en la fórmula estándar)
+    // Cálculo de IDF
     double idf = log2((N - nq + 0.5) / (nq + 0.5));
 
     int ftd = docInfo->second.getFT();
     int d = it->second.getNumPalSinParada();
     double avgdl = static_cast<double>(informacionColeccionDocs.getNumTotalPalSinParada()) / N;
     
-    // Fórmula BM25 corregida
+    // Fórmula BM25
     double numerador = ftd * (k1 + 1);
     double denominador = ftd + k1 * (1 - b + b * (d / avgdl));
     double frac = numerador / denominador;
